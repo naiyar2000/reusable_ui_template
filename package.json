@@ -1,5 +1,5 @@
 {
-  "name": "turbonote",
+  "name": "reusable_ui_template",
   "private": true,
   "workspaces": [
     "apps/*",
