@@ -1,0 +1,91 @@
+name: Rebuild and Push Docker Image with Clean Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+        service_id:
+          description: 'Service ID(1. UI; 2. Server)'
+          required: true
+          type: choice
+          options:
+            - srv-d1epn77fte5s73ffdab0
+            - srv-d1epkimuk2gs73bfr5ag
+        repo_name:
+          description: 'Select DockerHub repo'
+          required: true
+          type: choice
+          options:
+            - nirock2000/turbonote_ui
+            - nirock2000/turbonote_backend
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Create .env file
+        run: |
+          echo "NEXT_PUBLIC_FIREBASE_API_KEY=${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}" >> apps/web/.env
+          echo "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}" >> apps/web/.env
+          echo "NEXT_PUBLIC_FIREBASE_PROJECT_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}" >> apps/web/.env
+          echo "NEXT_PUBLIC_BACKEND_URL=${{ secrets.NEXT_PUBLIC_BACKEND_URL }}" >> apps/web/.env
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> apps/server/.env
+          echo "CLIENT_URL=${{ secrets.CLIENT_URL }}" >> apps/server/.env
+          echo "ELASTICSEARCH_API_KEY=${{ secrets.ELASTICSEARCH_API_KEY }}" >> apps/server/.env
+          echo "ELASTICSEARCH_NODE=${{ secrets.ELASTICSEARCH_NODE }}" >> apps/server/.env
+          echo "MEILI_URL=${{ secrets.MEILI_URL }}" >> apps/server/.env
+          echo "MEILI_MASTER_KEY=${{ secrets.MEILI_MASTER_KEY }}" >> apps/server/.env
+
+      - name: Write Firebase service account key
+        run: |
+          echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}" | base64 -d > apps/server/firebase-service-account.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Dependencies (monorepo root)
+        run: npm install
+
+      # - name: Delete old :latest tag from Docker Hub
+      #   run: |
+      #     curl -X DELETE -u "${{ secrets.DOCKER_USERNAME }}:${{ secrets.DOCKER_PASSWORD }}" \
+      #     https://hub.docker.com/v2/repositories/${{ secrets.DOCKER_USERNAME }}/turbonote_ui/tags/latest/
+      #   continue-on-error: true  # ignore if tag doesn't exist
+
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Set Dockerfile path based on repo
+        id: dockerfile
+        run: |
+          if [ "${{ github.event.inputs.repo_name }}" = "nirock2000/turbonote_ui" ]; then
+            echo "DOCKERFILE=docker/web.Dockerfile" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.inputs.repo_name }}" = "nirock2000/turbonote_backend" ]; then
+            echo "DOCKERFILE=docker/server.Dockerfile" >> "$GITHUB_OUTPUT"
+          else
+            echo "Unknown repo_name: ${{ github.event.inputs.repo_name }}"
+            exit 1
+          fi
+
+      - name: Build new Docker image
+        run: docker build -t ${{ github.event.inputs.repo_name }}:latest -f ${{ steps.dockerfile.outputs.DOCKERFILE }} .
+
+      - name: Push new Docker image
+        run: docker push ${{ github.event.inputs.repo_name }}:latest
+
+      - name: Trigger Render redeploy
+        run: |
+          curl --request POST \
+            --url https://api.render.com/v1/services/${{ github.event.inputs.service_id }}/deploys \
+            --header 'accept: application/json' \
+            --header 'authorization: Bearer ${{ secrets.RENDER_API_KEY }}' \
+            --header 'content-type: application/json' \
+            --data '{
+              "clearCache": "do_not_clear",
+              "imageUrl": "docker.io/${{ github.event.inputs.repo_name }}:latest"
+            }'
