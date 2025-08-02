@@ -141,11 +141,9 @@ const SidebarItemComponent = ({ item, itemClick, level = 0, }: SidebarItemProps)
           />
         }
 
-        {item.type === "folder" ? (
-          <Folder className="h-5 w-5 text-primary" />
-        ) : (
-          <FileText className="h-5 w-5 text-primary" />
-        )}
+        {
+          <IconComponent icon={item.type} />
+        }
 
         {isEditing ? (
           <input
@@ -325,3 +323,15 @@ export const Sidebar = ({ itemClick }: { itemClick?: () => void }) => {
     </aside>
   );
 };
+
+
+const IconComponent = ({ icon }: { icon: string }) => {
+  switch (icon) {
+    case "page":
+      return <FileText className="h-5 w-5 text-primary" />;
+    case "folder":
+      return <Folder className="h-5 w-5 text-primary" />;
+    default:
+      return null;
+  }
+}
