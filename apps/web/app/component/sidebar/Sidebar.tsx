@@ -141,9 +141,7 @@ const SidebarItemComponent = ({ item, itemClick, level = 0, }: SidebarItemProps)
           />
         }
 
-        {
-          <IconComponent icon={item.type} />
-        }
+        <IconComponent icon={item.type} />
 
         {isEditing ? (
           <input
