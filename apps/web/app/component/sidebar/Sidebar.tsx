@@ -14,7 +14,6 @@ import {
   Edit,
   Trash,
   Edit2,
-  Search,
   Home,
 } from "lucide-react";
 import {
@@ -36,7 +35,6 @@ import { useParams, useRouter } from "next/navigation";
 import { deleteNote, fetchNotes, updateNote } from "@/lib/api/notes";
 import { v4 as uuidv4 } from 'uuid';
 import { MY_WORKSPACE } from "@/lib/routeConstants";
-import { Button } from "@/components/ui/button";
 import SearchComponent from "./SearchComponent";
 
 type SidebarItemProps = {
